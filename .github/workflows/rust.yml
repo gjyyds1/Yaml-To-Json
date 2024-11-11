@@ -1,0 +1,53 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+        architecture: [x86_64, aarch64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Install dependencies
+        run: |
+          rustup target add ${{ matrix.architecture }}-unknown-linux-gnu
+          rustup target add ${{ matrix.architecture }}-apple-darwin
+          rustup target add ${{ matrix.architecture }}-pc-windows-msvc
+
+      - name: Build project
+        run: |
+          cargo build --release --target=${{ matrix.architecture }}-unknown-linux-gnu
+        env:
+          TARGET_ARCH: ${{ matrix.architecture }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ytj-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: target/${{ matrix.architecture }}-unknown-linux-gnu/release/ytj
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "target/**/*.yml"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
